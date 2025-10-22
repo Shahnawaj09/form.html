@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Adiba — Template Fill</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--w:820px;--h:1160px;--pad:72px;--accent:#b8860b}
+    body{display:flex;justify-content:center;background:#f4f6fb;margin:18px}
+    .page{width:var(--w);height:var(--h);position:relative;background-size:cover;background-position:center;border:1px solid #ddd;border-radius:6px;box-shadow:0 12px 28px rgba(10,10,30,0.06)}
+    .content{position:absolute;left:var(--pad);right:var(--pad);top:var(--pad);bottom:var(--pad);display:flex;gap:18px;z-index:1}
+    .left{flex:1;padding:18px;color:#111}
+    .name{font-family:Merriweather,serif;font-size:34px;color:var(--accent);font-weight:700}
+    .kv{margin-top:10px}
+    .kv .row{display:flex;gap:12px;margin:8px 0}
+    .k{width:160px;font-weight:700;color:#666}
+    .v{flex:1}
+    .right{width:220px;display:flex;flex-direction:column;align-items:center;gap:12px}
+    .photoWrap{width:180px;height:230px;border-radius:8px;overflow:hidden;background:#fff;border:6px solid rgba(255,255,255,0.6);box-shadow:0 8px 18px rgba(0,0,0,0.08)}
+    .photoWrap img{width:100%;height:100%;object-fit:cover}
+    .credit{position:absolute;bottom:12px;right:var(--pad);font-size:12px;color:rgba(0,0,0,0.45)}
+  </style>
+</head>
+<body>
+  <div id="page" class="page" style="background-image:url('/assets/bg2.png')">
+    <div class="content">
+      <div class="left">
+        <div class="name" id="tmpl_name">[Full name]</div>
+        <div style="color:#666;margin-top:6px" id="tmpl_sub">Marriage Biodata</div>
+
+        <div class="kv" id="tmpl_kv">
+          <div class="row"><div class="k">Date of birth</div><div class="v" id="tmpl_dob">--</div></div>
+          <div class="row"><div class="k">Place of birth</div><div class="v" id="tmpl_place">--</div></div>
+          <div class="row"><div class="k">Religion</div><div class="v" id="tmpl_religion">--</div></div>
+          <div class="row"><div class="k">Education</div><div class="v" id="tmpl_education">--</div></div>
+          <div class="row"><div class="k">Occupation</div><div class="v" id="tmpl_occupation">--</div></div>
+          <div class="row"><div class="k">Contact</div><div class="v" id="tmpl_contact">--</div></div>
+          <div class="row" id="customRow1" style="display:none"><div class="k" id="c1k"></div><div class="v" id="c1v"></div></div>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="photoWrap" id="tmpl_photo"><img id="photoImg" src="" alt="" style="display:none" /></div>
+      </div>
+    </div>
+
+    <div class="credit">Background: <a href="https://www.vecteezy.com/free-vector/border" target="_blank">Vecteezy</a></div>
+  </div>
+
+<script>
+/* populateTemplate updates DOM from payload object */
+function populateTemplate(payload){
+  if(!payload) return;
+  const page = document.getElementById('page');
+  document.getElementById('tmpl_name').textContent = payload.name || '';
+  document.getElementById('tmpl_dob').textContent = payload.dob || '';
+  document.getElementById('tmpl_place').textContent = payload.place || '';
+  document.getElementById('tmpl_religion').textContent = payload.religion || '';
+  document.getElementById('tmpl_education').textContent = payload.education || '';
+  document.getElementById('tmpl_occupation').textContent = payload.occupation || '';
+  document.getElementById('tmpl_contact').textContent = payload.contact || '';
+
+  if(payload.custom1 && payload.custom1.k){
+    document.getElementById('c1k').textContent = payload.custom1.k;
+    document.getElementById('c1v').textContent = payload.custom1.v || '';
+    document.getElementById('customRow1').style.display = '';
+  } else { document.getElementById('customRow1').style.display = 'none'; }
+
+  // photo
+  const img = document.getElementById('photoImg');
+  if(payload.photo){
+    img.src = payload.photo;
+    img.style.display = 'block';
+  } else { img.style.display = 'none'; }
+
+  // background
+  if(payload.background){
+    page.style.backgroundImage = `url('${payload.background}')`;
+  }
+}
+
+/* export helpers: html2canvas + jsPDF lazy load */
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.onload=res; s.onerror=rej; s.src=src; document.head.appendChild(s); }); }
+
+async function exportAsPNG(fileName){
+  if(!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  const node = document.getElementById('page');
+  // wait until images load (photo)
+  await waitForImages(node);
+  const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: null });
+  const url = canvas.toDataURL('image/png');
+  // trigger download
+  const a = document.createElement('a'); a.href = url; a.download = (fileName || 'biodata') + '.png'; a.click();
+  // notify parent
+  window.parent?.postMessage({type:'exportComplete'}, '*');
+}
+
+async function exportAsPDF(fileName){
+  if(!window.html2canvas) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  if(!window.jspdf) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  const node = document.getElementById('page');
+  await waitForImages(node);
+  const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+  const imgData = canvas.toDataURL('image/png');
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','mm','a4');
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const mmPerPx = 25.4 / 96;
+  const wInMM = canvas.width * mmPerPx;
+  const hInMM = canvas.height * mmPerPx;
+  const printH = (hInMM * pdfWidth) / wInMM;
+  pdf.addImage(imgData, 'PNG', 0, (pdf.internal.pageSize.getHeight() - printH) / 2, pdfWidth, printH);
+  pdf.save((fileName || 'biodata') + '.pdf');
+  window.parent?.postMessage({type:'exportComplete'}, '*');
+}
+
+function waitForImages(node){
+  const imgs = node.querySelectorAll('img');
+  const arr = Array.from(imgs).map(img => {
+    if(img.complete) return Promise.resolve();
+    return new Promise(r => img.onload = img.onerror = r);
+  });
+  return Promise.all(arr);
+}
+
+/* message listener for postMessage from parent */
+window.addEventListener('message', async (e)=>{
+  // prod: check e.origin
+  const msg = e.data || {};
+  if(msg.type !== 'fillAndExport') return;
+
+  try{
+    populateTemplate(msg.payload || {});
+    // small delay to ensure layout updates
+    await new Promise(r => setTimeout(r, 300));
+    window.parent?.postMessage({type:'exportStarted'}, '*');
+
+    if(msg.autoExport){
+      if(msg.exportType === 'pdf') await exportAsPDF(msg.payload?.name || 'biodata');
+      else if(msg.exportType === 'png') await exportAsPNG(msg.payload?.name || 'biodata');
+      else if(msg.exportType === 'both'){ await exportAsPNG(msg.payload?.name || 'biodata'); await new Promise(r=>setTimeout(r,400)); await exportAsPDF(msg.payload?.name || 'biodata'); }
+    }
+  }catch(err){
+    window.parent?.postMessage({type:'error', error: err.message}, '*');
+  }
+});
+</script>
+</body>
+</html>

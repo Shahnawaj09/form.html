@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Adiba — Form → Template (iframe)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:18px;background:#f6f7fb}
+    .wrap{max-width:1100px;margin:0 auto}
+    label{display:block;margin-top:10px;font-weight:600}
+    input, select, textarea{width:100%;padding:8px;margin-top:6px;border-radius:6px;border:1px solid #ddd}
+    .row{display:flex;gap:12px}
+    .col{flex:1}
+    .btn{margin-top:12px;padding:10px 12px;border-radius:8px;border:0;background:#6c5ce7;color:#fff;cursor:pointer}
+    iframe{width:820px;height:1160px;border:1px solid #ddd;margin-top:18px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>Adiba — Fill biodata</h2>
+
+    <label>Full name *</label>
+    <input id="name" type="text" />
+
+    <div class="row">
+      <div class="col">
+        <label>Date of birth *</label>
+        <input id="dob" type="date" />
+      </div>
+      <div class="col">
+        <label>Place of birth</label>
+        <input id="place" type="text" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Religion</label>
+        <select id="religion">
+          <option value="">—</option><option>HINDUISM</option><option>ISLAM</option><option>SIKH</option><option>CHRISTIAN</option><option>OTHER</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Education</label>
+        <input id="education" type="text" />
+      </div>
+    </div>
+
+    <label>Occupation</label>
+    <input id="occupation" type="text" />
+
+    <div class="row">
+      <div class="col">
+        <label>Contact number (10 digits)</label>
+        <input id="contactNumber" type="text" maxlength="10" placeholder="98765xxxxx" />
+      </div>
+      <div class="col">
+        <label>Background (template)</label>
+        <select id="background">
+          <option value="/assets/bg1.png">Yellow floral</option>
+          <option value="/assets/bg2.png" selected>Pastel ornate (default)</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Upload photo (optional)</label>
+    <input type="file" id="photoUpload" accept="image/*" />
+
+    <label style="margin-top:18px">Custom field 1 (label)</label>
+    <input id="custom1key" type="text" placeholder="Label (e.g., Gotra)" />
+    <label>Custom field 1 (value)</label>
+    <input id="custom1val" type="text" />
+
+    <button id="sendToTemplateBtn" class="btn">Preview & Export (auto)</button>
+
+    <!-- Template iframe -->
+    <iframe id="templateFrame" src="/template-fill.html"></iframe>
+  </div>
+
+<script>
+// convert file -> dataURL
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    if(!file) return resolve(null);
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+async function buildPayload(){
+  const name = document.getElementById('name').value.trim();
+  const dob  = document.getElementById('dob').value;
+  const place = document.getElementById('place').value.trim();
+  const religion = document.getElementById('religion').value;
+  const education = document.getElementById('education').value;
+  const occupation = document.getElementById('occupation').value;
+  const contactNumber = document.getElementById('contactNumber').value.trim();
+  const background = document.getElementById('background').value || '/assets/bg2.png';
+
+  // photo
+  const file = document.getElementById('photoUpload').files[0];
+  const photo = await fileToDataUrl(file);
+
+  const custom1k = document.getElementById('custom1key').value.trim();
+  const custom1v = document.getElementById('custom1val').value.trim();
+
+  return {
+    name, dob, place, religion, education, occupation,
+    contact: contactNumber ? '+91 ' + contactNumber : '',
+    photo,
+    custom1: custom1k ? {k: custom1k, v: custom1v} : null,
+    background
+  };
+}
+
+document.getElementById('sendToTemplateBtn').addEventListener('click', async ()=>{
+  // Basic validation
+  if(!document.getElementById('name').value.trim() || !document.getElementById('dob').value){
+    alert('Please enter name and date of birth.');
+    return;
+  }
+
+  const payload = await buildPayload();
+  const iframe = document.getElementById('templateFrame');
+  if(!iframe.contentWindow){ alert('Template frame not ready'); return; }
+
+  const message = {
+    type: 'fillAndExport',
+    payload,
+    autoExport: true,
+    exportType: 'both' // 'png' or 'pdf' or 'both'
+  };
+
+  // in production set target origin instead of '*'
+  iframe.contentWindow.postMessage(message, '*');
+});
+
+// optional: listen status messages from iframe
+window.addEventListener('message', (e)=>{
+  // if (e.origin !== 'https://your-domain') return; // set origin in production
+  const data = e.data || {};
+  if(data.type === 'exportStarted') console.log('Export started');
+  if(data.type === 'exportComplete') console.log('Export complete');
+  if(data.type === 'error') console.error('Template error:', data.error);
+});
+</script>
+</body>
+</html>
